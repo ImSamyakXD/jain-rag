@@ -45,39 +45,32 @@ async function sendMessage() {
 
 
     try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 60000);
 
         const response = await fetch(
             "/chat",
             {
                 method: "POST",
-
                 headers: {
                     "Content-Type": "application/json"
                 },
-
+                signal: controller.signal,
                 body: JSON.stringify({
                     message: question
                 })
             }
         );
-
+        clearTimeout(timeoutId);
 
         if (!response.ok) {
-
-            throw new Error(
-                "Server error: " +
-                response.status
-            );
-
+            throw new Error("Server error: " + response.status);
         }
-
 
         const data = await response.json();
 
-
         // Remove loading
         loading.remove();
-
 
         // Show answer
         addMessage(
@@ -94,7 +87,7 @@ async function sendMessage() {
         loading.remove();
 
         addMessage(
-            "❌ Unable to connect to the server.",
+            "⏳ Server is warming up or connecting. Please wait a few seconds and send your question again!",
             "bot"
         );
 

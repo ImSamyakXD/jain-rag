@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -8,8 +9,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-# Top-level import to pre-warm HuggingFace embeddings & ChromaDB in memory
-from rag import ask_question, clear_memory
+from rag import ask_question, clear_memory, get_base_retriever, get_llm
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -38,6 +38,19 @@ if STATIC_DIR.exists():
 templates = Jinja2Templates(
     directory=str(TEMPLATES_DIR)
 )
+
+
+@app.on_event("startup")
+async def startup_event():
+    def prewarm():
+        try:
+            print("Starting background pre-warm of Vectorstore & LLM...", flush=True)
+            get_base_retriever()
+            get_llm()
+            print("Pre-warm successfully completed!", flush=True)
+        except Exception as e:
+            print(f"Pre-warm notice: {e}", flush=True)
+    threading.Thread(target=prewarm, daemon=True).start()
 
 
 class ChatRequest(BaseModel):
