@@ -128,40 +128,43 @@ def search_web_fallback(query: str) -> str:
             if body:
                 formatted.append(f"Source Title: {title}\nSummary: {body}")
         return "\n\n".join(formatted)
+        from ddgs import DDGS
+        results = []
+        search_query = f"{query} Jainism site:jainnet.com OR site:jainworld.com OR site:jainheritagecentres.com OR site:wikipedia.org"
+        with DDGS() as ddgs:
+            for r in ddgs.text(search_query, max_results=3):
+                results.append(f"Web Source: {r.get('title', '')}\n{r.get('body', '')}")
+        return "\n\n".join(results)
     except Exception as e:
-        print(f"Web search error: {e}")
+        print(f"Web search fallback notice: {e}")
         return ""
 
 
-def rewrite_question(question, history):
+def rewrite_question(question: str, history: list) -> str:
     if not history or not needs_rewrite(question):
         return question
 
-    history_text = "\n".join(
-        f"User: {item['question']}\n"
-        f"Assistant: {item['answer']}"
-        for item in history[-5:]
-    )
+    formatted_history = "\n".join([
+        f"User: {h['question']}\nAI: {h['answer']}"
+        for h in history[-3:]
+    ])
 
-    rewritten = (
-        rewrite_prompt
-        | get_llm()
-        | StrOutputParser()
-    ).invoke({
-        "history": history_text,
-        "question": question
-    })
+    try:
+        chain = rewrite_prompt | get_llm() | StrOutputParser()
+        rewritten = chain.invoke({
+            "history": formatted_history,
+            "question": question
+        }).strip()
+        return rewritten if rewritten else question
+    except Exception as e:
+        print(f"Rewrite question notice: {e}")
+        return question
 
-    return rewritten.strip()
 
-
-def is_jai_jinendra_greeting(q: str) -> bool:
-    cleaned = q.strip().lower().replace("!", "").replace(".", "").replace(",", "").replace("?", "")
-    greetings = {
-        "jai jinendra", "jai jinendraa", "jai jinendram", "jai jinendr",
-        "jai jinendarr", "जय जिनेन्द्र", "जय जिनेन्द्र!", "जय जिनेंद्र"
-    }
-    return cleaned in greetings or cleaned == "jai jinendra" or cleaned == "जय जिनेन्द्र"
+def is_jai_jinendra_greeting(question: str) -> bool:
+    q = question.strip().lower()
+    greetings = ["jai jinendra", "जय जिनेन्द्र", "namaste", "hello", "hi", "pranam", "प्रणाम"]
+    return any(g in q for g in greetings)
 
 
 FAST_TOPIC_ANSWERS = {
@@ -252,14 +255,18 @@ def ask_question(question):
         context = "No specific external documents retrieved."
 
     # 3. Generate answer using direct_jainism_prompt with domain guardrail
-    answer = (
-        direct_jainism_prompt
-        | get_llm()
-        | StrOutputParser()
-    ).invoke({
-        "context": context,
-        "question": standalone_question
-    }).strip()
+    try:
+        answer = (
+            direct_jainism_prompt
+            | get_llm()
+            | StrOutputParser()
+        ).invoke({
+            "context": context,
+            "question": standalone_question
+        }).strip()
+    except Exception as llm_err:
+        print(f"LLM generation error: {llm_err}")
+        return "Jai Jinendra! 🙏 The AI service is currently configuring its Gemini API key. Please ensure GOOGLE_API_KEY is set in your Render environment variables."
 
     conversation_history.append({
         "question": question,
