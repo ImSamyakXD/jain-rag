@@ -21,8 +21,11 @@ _base_retriever = None
 def get_llm():
     global _llm
     if _llm is None:
+        import os
+        api_key = os.getenv("GOOGLE_API_KEY")
         _llm = ChatGoogleGenerativeAI(
-            model="gemini-flash-latest",
+            model="gemini-1.5-flash",
+            google_api_key=api_key if api_key else None,
             temperature=0
         )
     return _llm
