@@ -7,21 +7,16 @@ python-dotenv
 langchain
 langchain-core
 langchain-community
-langchain-classic
 langchain-chroma
 langchain-huggingface
 langchain-google-genai
-langchain-text-splitters
 
 chromadb
 sentence-transformers
 transformers
+
+--extra-index-url https://download.pytorch.org/whl/cpu
 torch
 
-docx2txt
 pypdf
-pdf2image
-pytesseract
-pillow
-ddgs
 gunicorn
