@@ -10,6 +10,7 @@ langchain-community
 langchain-chroma
 langchain-huggingface
 langchain-google-genai
+langchain-groq
 
 chromadb
 sentence-transformers

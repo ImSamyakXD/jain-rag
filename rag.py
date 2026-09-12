@@ -22,12 +22,26 @@ def get_llm():
     global _llm
     if _llm is None:
         import os
-        api_key = os.getenv("GOOGLE_API_KEY")
-        _llm = ChatGoogleGenerativeAI(
-            model="gemini-1.5-flash",
-            google_api_key=api_key if api_key else None,
-            temperature=0
-        )
+        groq_key = os.getenv("GROQ_API_KEY")
+        google_key = os.getenv("GOOGLE_API_KEY")
+
+        if groq_key and groq_key.strip():
+            try:
+                from langchain_groq import ChatGroq
+                _llm = ChatGroq(
+                    model_name="llama-3.3-70b-versatile",
+                    groq_api_key=groq_key.strip(),
+                    temperature=0
+                )
+            except Exception as e:
+                print(f"Groq LLM init error: {e}")
+
+        if _llm is None:
+            _llm = ChatGoogleGenerativeAI(
+                model="gemini-1.5-flash",
+                google_api_key=google_key if google_key else None,
+                temperature=0
+            )
     return _llm
 
 def get_base_retriever():
