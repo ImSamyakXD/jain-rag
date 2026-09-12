@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JainGPT — A Real Jainism Product</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- TOP NAV -->
+<header class="topnav">
+    <div class="topnav-inner">
+        <a href="/" class="brand">
+            <span class="brand-mark">卐</span>
+            <span class="brand-text">
+                Jain<span class="accent">GPT</span>
+            </span>
+        </a>
+
+        <span class="brand-tag">A Real Jainism Product</span>
+
+        <a href="https://realjainismx.netlify.app/" class="btn btn-outline nav-cta" target="_blank" rel="noopener">
+            Visit Real Jainism →
+        </a>
+    </div>
+</header>
+
+<div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+        <p class="eyebrow">Explore</p>
+
+        <button id="newChat" class="new-chat">
+            + New Chat
+        </button>
+
+        <div class="topics">
+            <button class="topic" data-question="पंच महाव्रत क्या हैं?">
+                <span class="topic-icon">🕉️</span>
+                <span>पंच महाव्रत</span>
+            </button>
+
+            <button class="topic" data-question="अनेकांतवाद का सिद्धांत क्या है?">
+                <span class="topic-icon">☸️</span>
+                <span>अनेकांतवाद</span>
+            </button>
+
+            <button class="topic" data-question="What is the concept of Karma in Jainism?">
+                <span class="topic-icon">📿</span>
+                <span>Karma Theory</span>
+            </button>
+
+            <button class="topic" data-question="चौबीस तीर्थंकर कौन हैं?">
+                <span class="topic-icon">🙏</span>
+                <span>तीर्थंकर</span>
+            </button>
+
+            <button class="topic" data-question="What is Ahimsa according to Jain philosophy?">
+                <span class="topic-icon">🕊️</span>
+                <span>Ahimsa</span>
+            </button>
+        </div>
+
+        <div class="sidebar-footer">
+            Answers are grounded only in the scripture knowledge base — Hindi or English, matched to your question.
+        </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+        <div id="welcome" class="welcome">
+            <p class="eyebrow">जय जिनेन्द्र</p>
+
+            <h1>
+                Everything <span class="accent">Jain</span>,<br>
+                answered.
+            </h1>
+
+            <p class="welcome-sub">
+                Ask JainGPT about scriptures, philosophy, and practice —
+                in Hindi or English. Grounded in the Agams and Sutras,
+                not guesswork.
+            </p>
+        </div>
+
+        <div id="messages" class="messages"></div>
+
+        <!-- INPUT -->
+        <div class="input-area">
+            <textarea id="input" placeholder="पंच महाव्रत के बारे में पूछें... / Ask about Jain philosophy..." rows="1"></textarea>
+            <button id="send">➤</button>
+        </div>
+
+        <p class="footer-text">
+            JainGPT — A Real Jainism Product · answers are drawn only from the loaded scripture knowledge base.
+        </p>
+    </main>
+</div>
+
+<script src="/static/script.js"></script>
+</body>
+</html>
