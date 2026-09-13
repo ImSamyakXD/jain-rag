@@ -17,7 +17,7 @@ STATIC_DIR = BASE_DIR / "static"
 TEMPLATES_DIR = BASE_DIR / "templates"
 
 
-app = FastAPI(title="RealJainism AI")
+app = FastAPI(title="JainGPT AI")
 
 app.add_middleware(
     CORSMiddleware,
@@ -34,7 +34,6 @@ if STATIC_DIR.exists():
         name="static"
     )
 
-
 templates = Jinja2Templates(
     directory=str(TEMPLATES_DIR)
 )
@@ -44,10 +43,10 @@ templates = Jinja2Templates(
 async def startup_event():
     def prewarm():
         try:
-            print("Starting background pre-warm of Vectorstore & LLM...", flush=True)
+            print("Pre-warming JainGPT AI service...", flush=True)
             get_base_retriever()
             get_llm()
-            print("Pre-warm successfully completed!", flush=True)
+            print("JainGPT AI service ready!", flush=True)
         except Exception as e:
             print(f"Pre-warm notice: {e}", flush=True)
     threading.Thread(target=prewarm, daemon=True).start()
@@ -59,7 +58,7 @@ class ChatRequest(BaseModel):
 
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "RealJainism AI RAG"}
+    return {"status": "ok", "service": "JainGPT AI"}
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -72,10 +71,18 @@ async def home(request: Request):
 
 @app.post("/chat")
 async def chat(request: ChatRequest):
-    # Run synchronous heavy ML/API logic in a threadpool to prevent blocking the event loop
     answer = await asyncio.to_thread(ask_question, request.message)
-
     return {
+        "answer": answer
+    }
+
+
+@app.post("/api/chat")
+async def api_chat(request: ChatRequest):
+    """Clean API endpoint for website integration."""
+    answer = await asyncio.to_thread(ask_question, request.message)
+    return {
+        "response": answer,
         "answer": answer
     }
 
@@ -83,7 +90,6 @@ async def chat(request: ChatRequest):
 @app.post("/clear-memory")
 async def clear_chat_memory():
     clear_memory()
-
     return {
         "message": "Memory cleared"
     }

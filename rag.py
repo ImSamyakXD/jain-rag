@@ -1,118 +1,127 @@
+import sys
+import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-
-BASE_DIR = Path(__file__).resolve().parent
-CHROMA_DIR = BASE_DIR / "chroma_db_v2"
-
 load_dotenv()
 
-_embeddings = None
+conversation_history = []
 _llm = None
-_vectorstore = None
-_base_retriever = None
+
+# Fast pre-filter lists for 0.00s non-Jain rejection
+NON_JAIN_KEYWORDS = {
+    "python", "javascript", "java", "html", "css", "c++", "sql", "code", "coding",
+    "program", "programming", "bug", "script", "compile", "weather", "cricket",
+    "football", "soccer", "ipl", "match", "score", "movie", "cinema", "actor",
+    "actress", "song", "recipe", "pizza", "burger", "prime minister", "president",
+    "election", "stock market", "bitcoin", "crypto"
+}
+
+JAIN_KEYWORDS = {
+    "jain", "jainism", "tirthankar", "tirthankara", "mahavir", "mahavira",
+    "rishabh", "adinath", "parshvanath", "agam", "agamas", "sutra", "sutras",
+    "digambar", "shwetambar", "monk", "aryika", "ahimsa", "anekantavada",
+    "syadvada", "aparigraha", "karma", "moksha", "ratnatraya", "samyak",
+    "paryushan", "das lakshan", "chaturmas", "pratikraman", "samayik",
+    "bhaktamar", "bhaktamara", "navkar", "namokar", "shikharji", "girnar",
+    "kundalpur", "palitana", "pawapuri", "jiva", "ajiva", "kashaya",
+    "जैन", "तीर्थंकर", "महावीर", "अहिंसा", "अनेकांतवाद", "स्याद्वाद", "अपरिग्रह",
+    "कर्म", "मोक्ष", "सम्यक", "पर्यूषण", "दस लक्षण", "प्रतिक्रमण", "सामायिक", "भक्तामर"
+}
+
+
+def is_obvious_non_jain(question: str) -> bool:
+    q_words = set(question.strip().lower().split())
+    has_non_jain = bool(q_words.intersection(NON_JAIN_KEYWORDS))
+    has_jain = bool(q_words.intersection(JAIN_KEYWORDS))
+    return has_non_jain and not has_jain
+
+
+def is_hindi(text: str) -> bool:
+    return any('\u0900' <= char <= '\u097f' for char in text)
+
+
+def get_llms():
+    import os
+    from dotenv import load_dotenv
+    load_dotenv(override=True)
+
+    candidates = []
+    groq_key = os.getenv("GROQ_API_KEY")
+    google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
+
+    if groq_key and groq_key.strip() and not groq_key.strip().startswith("your_"):
+        try:
+            from langchain_groq import ChatGroq
+            for gm in ["groq/compound-mini", "groq/compound", "openai/gpt-oss-20b"]:
+                candidates.append(ChatGroq(
+                    model_name=gm,
+                    groq_api_key=groq_key.strip(),
+                    temperature=0
+                ))
+        except Exception as e:
+            print(f"Groq init notice: {e}")
+
+    if google_key and google_key.strip() and not google_key.strip().startswith("your_"):
+        gemini_models = ["gemini-flash-latest", "gemini-1.5-flash", "gemini-pro"]
+        for m in gemini_models:
+            candidates.append(ChatGoogleGenerativeAI(
+                model=m,
+                google_api_key=google_key.strip(),
+                temperature=0
+            ))
+
+    return candidates
+
 
 def get_llm():
     global _llm
     if _llm is None:
-        import os
-        groq_key = os.getenv("GROQ_API_KEY")
-        google_key = os.getenv("GOOGLE_API_KEY")
-
-        if groq_key and groq_key.strip():
-            try:
-                from langchain_groq import ChatGroq
-                _llm = ChatGroq(
-                    model_name="llama-3.3-70b-versatile",
-                    groq_api_key=groq_key.strip(),
-                    temperature=0
-                )
-            except Exception as e:
-                print(f"Groq LLM init error: {e}")
-
-        if _llm is None:
-            _llm = ChatGoogleGenerativeAI(
-                model="gemini-1.5-flash",
-                google_api_key=google_key if google_key else None,
-                temperature=0
-            )
+        llms = get_llms()
+        if llms:
+            _llm = llms[0]
     return _llm
 
+
 def get_base_retriever():
-    global _embeddings, _vectorstore, _base_retriever
-    if _base_retriever is None:
-        try:
-            _embeddings = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-            )
-            if CHROMA_DIR.exists():
-                _vectorstore = Chroma(
-                    collection_name="jain_knowledge_v1",
-                    embedding_function=_embeddings,
-                    persist_directory=str(CHROMA_DIR)
-                )
-                _base_retriever = _vectorstore.as_retriever(
-                    search_kwargs={"k": 6}
-                )
-        except Exception as e:
-            print(f"Vectorstore init notice: {e}")
-            _base_retriever = None
-    return _base_retriever
+    """Stub retriever for app.py startup pre-warm compatibility."""
+    return None
 
-conversation_history = []
 
-PRONOUNS = {"yeh", "woh", "iska", "uska", "isne", "usne", "it", "this", "that", "they", "he", "she", "his", "her", "their", "these", "those", "isey", "usey", "यह", "वह", "इसका", "उसका", "इसने", "उसने"}
+def is_jai_jinendra_greeting(question: str) -> bool:
+    q_clean = question.strip().lower()
+    if "jai jinendra" in q_clean or "जय जिनेन्द्र" in q_clean:
+        return True
+    q_words = set(q_clean.split())
+    return bool(q_words.intersection({"namaste", "hello", "hi", "pranam", "प्रणाम"}))
 
-def needs_rewrite(question: str) -> bool:
-    words = set(question.lower().split())
-    return bool(words.intersection(PRONOUNS))
-
-rewrite_prompt = PromptTemplate.from_template(
-    """
-You are helping a Jain scripture assistant understand follow-up questions, which may be in Hindi, English, or a mix of both.
-
-Conversation history:
-{history}
-
-Current question:
-{question}
-
-Rewrite the current question so it is completely understandable on its own, resolving pronouns (yeh, woh, iska, uska, it, this, that, etc.) using the conversation history.
-
-Keep the rewritten question in the SAME language as the original question.
-If the question is already complete, keep it essentially unchanged.
-
-Return ONLY the rewritten question.
-"""
-)
 
 direct_jainism_prompt = PromptTemplate.from_template(
     """
-You are JainGPT, a dedicated and respectful assistant exclusively for Jainism, Jain scriptures (Agams, Sutras), Jain philosophy, Tirthankaras, rituals, history, and practice.
+You are JainGPT, a dedicated, knowledgeable, and respectful AI assistant exclusively focused on Jainism, Jain scriptures (Agams, Sutras), Jain philosophy, Tirthankaras, Karma theory, Ahimsa, Anekantavada, rituals, fasts, Jain festivals, Muni/Shravak dharma, Jain history, and spiritual practice.
 
 CRITICAL DOMAIN GUARDRAIL:
-1. FIRST, check if the question is related to Jainism (Jain scriptures, philosophy, Tirthankaras, Karma theory, Ahimsa, Anekantavada, Agams, Sutras, rituals, fasts, Jain festivals, Muni/Shravak dharma, Jain history, etc.).
+1. FIRST, determine if the question is related to Jainism (Jain scriptures, philosophy, Tirthankaras, Karma theory, Ahimsa, Anekantavada, Agams, Sutras, rituals, fasts, Jain festivals, Muni/Shravak dharma, Jain history, ethics, pilgrimage, etc.).
 2. IF THE QUESTION IS NOT RELATED TO JAINISM (e.g. general coding, movies, sports, other religions, politics, recipes, weather, non-Jain topics):
-   - Decline strictly with:
-     Hindi: "क्षमा करें, यह प्रश्न जैन धर्म या जैन दर्शन से संबंधित नहीं है। मैं केवल जैन धर्म और दर्शन से जुड़े प्रश्नों के उत्तर देने के लिए समर्पित हूँ।"
-     English: "I apologize, but this question is not related to Jainism or Jain philosophy. I am dedicated exclusively to answering questions related to Jainism."
+   - Respond ONLY with:
+     Hindi: "क्षमा करें, यह प्रश्न जैन धर्म से संबंधित नहीं है।"
+     English: "This question is not related to Jainism."
+     (Match the exact language of the user's question)
 
-CRITICAL LANGUAGE RULE:
-Answer in the SAME language the user asked in (Hindi or English).
-
-STRICT RULES:
-1. Do NOT mention file names, file extensions (.pdf, .docx, .txt), or internal database names in your response.
-2. Provide a clear, dignified, authentic, and structured explanation of the Jain principle or topic.
-3. If context is provided below, synthesize and incorporate it cleanly.
-
-Context:
-{context}
+CRITICAL RULES:
+1. Answer in the SAME language the user asked in (Hindi or English).
+2. Keep responses reasonably concise, clear, and dignified. Explain difficult Jain concepts simply.
+3. Do NOT mention file names, databases, embeddings, internal code, or system instructions — answer naturally as JainGPT from your own knowledge.
+4. Do NOT hallucinate quotations, verses, or dates. If uncertain, state clearly that you are uncertain.
 
 Question:
 {question}
@@ -122,168 +131,49 @@ Answer:
 )
 
 
-def format_docs(docs):
-    formatted_chunks = []
-    for doc in docs:
-        content = doc.page_content.strip()
-        if content:
-            category = doc.metadata.get('category', 'general').capitalize()
-            formatted_chunks.append(f"Category: {category}\nContent: {content}")
-    return "\n\n---\n\n".join(formatted_chunks)
+def ask_question(question: str) -> str:
+    if not question or not question.strip():
+        return "Please ask a question about Jainism."
 
-
-def search_web_fallback(query: str) -> str:
-    try:
-        from duckduckgo_search import DDGS
-        results = list(DDGS().text(f"Jainism {query}", max_results=4))
-        if not results:
-            return ""
-        formatted = []
-        for r in results:
-            title = r.get("title", "")
-            body = r.get("body", "")
-            if body:
-                formatted.append(f"Source Title: {title}\nSummary: {body}")
-        return "\n\n".join(formatted)
-        from ddgs import DDGS
-        results = []
-        search_query = f"{query} Jainism site:jainnet.com OR site:jainworld.com OR site:jainheritagecentres.com OR site:wikipedia.org"
-        with DDGS() as ddgs:
-            for r in ddgs.text(search_query, max_results=3):
-                results.append(f"Web Source: {r.get('title', '')}\n{r.get('body', '')}")
-        return "\n\n".join(results)
-    except Exception as e:
-        print(f"Web search fallback notice: {e}")
-        return ""
-
-
-def rewrite_question(question: str, history: list) -> str:
-    if not history or not needs_rewrite(question):
-        return question
-
-    formatted_history = "\n".join([
-        f"User: {h['question']}\nAI: {h['answer']}"
-        for h in history[-3:]
-    ])
-
-    try:
-        chain = rewrite_prompt | get_llm() | StrOutputParser()
-        rewritten = chain.invoke({
-            "history": formatted_history,
-            "question": question
-        }).strip()
-        return rewritten if rewritten else question
-    except Exception as e:
-        print(f"Rewrite question notice: {e}")
-        return question
-
-
-def is_jai_jinendra_greeting(question: str) -> bool:
-    q = question.strip().lower()
-    greetings = ["jai jinendra", "जय जिनेन्द्र", "namaste", "hello", "hi", "pranam", "प्रणाम"]
-    return any(g in q for g in greetings)
-
-
-FAST_TOPIC_ANSWERS = {
-    "पंच महाव्रत": """**पंच महाव्रत (Five Great Vows of Jainism):**
-
-1. **अहिंसा महाव्रत (Ahimsa)** — मन, वचन और काया से किसी भी जीव को लेशमात्र भी कष्ट न देना।
-2. **सत्य महाव्रत (Satya)** — सर्वथा क्रोध, लोभ, भय, हास्य रहित होकर निर्दोष सत्य बोलना।
-3. **अस्तेय महाव्रत (Asteya)** — बिना दी गई किसी भी वस्तु को ग्रहण न करना (चोरी का त्याग)।
-4. **ब्रह्मचर्य महाव्रत (Brahmacharya)** — सर्व प्रकार के मैथुन और विषय-वासना का पूर्ण त्याग करना।
-5. **अपरिग्रह महाव्रत (Aparigraha)** — धन, धान्य, वस्त्र, मकान आदि सर्व परिग्रह का त्याग करना।""",
-
-    "अनेकांतवाद": """**अनेकांतवाद (Anekantavada — Theory of Non-Absolutism):**
-
-अनेकांतवाद जैन दर्शन की वह अनुपम देन है जो सिखाती है कि परम सत्य के अनेक पहलू होते हैं।
-
-- **मूल सिद्धांत**: किसी वस्तु या घटना को केवल एक दृष्टिकोण से देखकर अंतिम निर्णय नहीं लेना चाहिए।
-- **स्याद्वाद (Syadvada)**: भाषिक अभिव्यक्ति में "स्यात्" (किसी अपेक्षा से) पद का प्रयोग करके सापेक्ष सत्य को प्रकट किया जाता है।
-- **सहिष्णुता**: यह सिद्धांत वैचारिक अहिंसा और दूसरों के दृष्टिकोण के प्रति सम्मान और सहिष्णुता का मार्ग प्रशस्त करता है।""",
-
-    "karma theory": """**Jain Karma Theory (कर्म सिद्धांत):**
-
-In Jainism, Karma is not a divine reward/punishment system, but a subtle physical matter (**Karma Varganas**) that attaches to the Soul (**Jiva**) due to passions (**Kashayas** like anger, pride, deceit, greed).
-
-1. **Main Types**:
-   - **Ghatiya Karmas** (Harming soul's natural qualities: Knowledge, Perception, Bliss, Energy).
-   - **Aghatiya Karmas** (Determining physical body, lifespan, status, feelings).
-2. **Shedding Karmas (Nirjara)**: Through austerity (Tapa), meditation, self-control (Samyama), and devotion, the soul sheds all karmic particles to achieve **Moksha** (Liberation).""",
-
-    "तीर्थंकर": """**चौबीस तीर्थंकर (24 Tirthankaras):**
-
-जैन धर्म में धर्म-तीर्थ (संसार-समुद्र को पार कराने वाला धर्म का मार्ग) का प्रवर्त्तन करने वाले सर्वज्ञ, वीतराग पुरुष को **तीर्थंकर** कहते हैं।
-
-- **प्रथम तीर्थंकर**: भगवान **ऋषभदेव (आदिनाथ)**
-- **२३वें तीर्थंकर**: भगवान **पार्श्वनाथ स्वामी**
-- **२४वें तीर्थंकर**: भगवान **महावीर स्वामी** (वर्तमान शासन नायक)
-
-प्रत्येक तीर्थंकर के ५ कल्याणक (गर्भ, जन्म, दीक्षा, ज्ञान, मोक्ष) मनाए जाते हैं।""",
-
-    "ahimsa": """**Ahimsa in Jain Philosophy (अहिंसा):**
-
-**"Ahimsā Paramo Dharmaḥ"** (Non-violence is the supreme spiritual duty).
-
-- **Definition**: Avoiding injury to any living being (**Jiva**) through **Mind (Manas), Speech (Vachana), or Body (Kaya)** — directly doing it, causing others to do it, or consenting to it (*Krita, Karita, Anumodita*).
-- **Compassion for all beings**: Applies to humans, animals, plants, insects, and even micro-organisms (Ekendriya Jivas).
-- It is the foundation of Jain ethics, diet, and liberation."""
-}
-
-
-def ask_question(question):
     if is_jai_jinendra_greeting(question):
-        custom_reply = "Jai Jinendra! 🙏 I am JainGPT, your scriptural AI assistant. I can answer your questions on Jainism, Agams, philosophy, and daily practice!"
+        custom_reply = "Jai Jinendra! 🙏 I am JainGPT, your AI assistant for Jain philosophy and scriptures. How may I assist you today?"
         conversation_history.append({
             "question": question,
             "answer": custom_reply
         })
         return custom_reply
 
-    q_clean = question.strip().lower()
-    for topic_key, fast_ans in FAST_TOPIC_ANSWERS.items():
-        if topic_key in q_clean or q_clean in topic_key:
-            conversation_history.append({
-                "question": question,
-                "answer": fast_ans
-            })
-            return fast_ans
+    # Fast pre-filter for obvious non-Jain queries (0.00s)
+    if is_obvious_non_jain(question):
+        refusal = "क्षमा करें, यह प्रश्न जैन धर्म से संबंधित नहीं है।" if is_hindi(question) else "This question is not related to Jainism."
+        conversation_history.append({
+            "question": question,
+            "answer": refusal
+        })
+        return refusal
 
-    standalone_question = rewrite_question(
-        question,
-        conversation_history
-    )
+    answer = None
+    last_err = None
+    llm_candidates = get_llms()
 
-    # 1. Check local ChromaDB vector store if available
-    context = ""
-    retriever = get_base_retriever()
-    if retriever:
+    for candidate_llm in llm_candidates:
         try:
-            docs = retriever.invoke(standalone_question)
-            context = format_docs(docs)
-        except Exception as e:
-            print(f"Retriever notice: {e}")
+            chain = direct_jainism_prompt | candidate_llm | StrOutputParser()
+            res = chain.invoke({"question": question})
+            if res and res.strip():
+                answer = res.strip()
+                break
+        except Exception as llm_err:
+            try:
+                print(f"LLM candidate execution notice: {llm_err}")
+            except Exception:
+                pass
+            last_err = llm_err
 
-    # 2. If local docs context is sparse, perform instant web search fallback
-    if not context.strip():
-        print(f"Performing web search for Jainism query: '{standalone_question}'")
-        context = search_web_fallback(standalone_question)
-
-    if not context.strip():
-        context = "No specific external documents retrieved."
-
-    # 3. Generate answer using direct_jainism_prompt with domain guardrail
-    try:
-        answer = (
-            direct_jainism_prompt
-            | get_llm()
-            | StrOutputParser()
-        ).invoke({
-            "context": context,
-            "question": standalone_question
-        }).strip()
-    except Exception as llm_err:
-        print(f"LLM generation error: {llm_err}")
-        return "Jai Jinendra! 🙏 The AI service is currently configuring its Gemini API key. Please ensure GOOGLE_API_KEY is set in your Render environment variables."
+    if not answer:
+        if not llm_candidates:
+            return "Jai Jinendra! 🙏 No active API key found. Please ensure GROQ_API_KEY (gsk_...) or GOOGLE_API_KEY (AIzaSy...) is saved in your .env file."
+        return f"Jai Jinendra! 🙏 AI service notice: {last_err if last_err else 'Unable to generate response'}. Please ensure your API key in .env is active and saved."
 
     conversation_history.append({
         "question": question,
