@@ -56,9 +56,15 @@ class ChatRequest(BaseModel):
     message: str
 
 
+from datetime import datetime, timezone
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "service": "JainGPT AI"}
+    return {
+        "success": True,
+        "status": "ok",
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
 
 
 @app.get("/", response_class=HTMLResponse)
