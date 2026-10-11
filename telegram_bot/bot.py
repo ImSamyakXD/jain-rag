@@ -1,5 +1,7 @@
 import sys
 import os
+import threading
+from http.server import HTTPServer, BaseHTTPRequestHandler
 from pathlib import Path
 from dotenv import load_dotenv
 import requests
@@ -25,6 +27,34 @@ from telegram.ext import (
 
 TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 API_URL = os.getenv("JAINGPT_API_URL", "https://jaingpt-bot.onrender.com/api/chat").strip()
+
+
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Minimal HTTP server to satisfy Render's free Web Service port check."""
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"status": "ok", "service": "jaingpt-telegram-bot"}')
+
+    def log_message(self, format, *args):
+        # Silence standard HTTP access logs
+        pass
+
+
+def start_health_server():
+    """Start background HTTP server on PORT so Render recognizes the service as live."""
+    port_str = os.getenv("PORT")
+    if not port_str:
+        return
+    try:
+        port = int(port_str)
+        server = HTTPServer(("0.0.0.0", port), HealthCheckHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        print(f"Health server listening on port {port} (Render compatible)", flush=True)
+    except Exception as err:
+        print(f"Notice: Could not start health server on port {port_str}: {err}", flush=True)
 
 
 def query_jaingpt(question: str) -> str:
@@ -146,6 +176,7 @@ def build_telegram_app():
 
 
 def main():
+    start_health_server()
     print(f"Starting standalone JainGPT Telegram Bot (@Jaingpt_bot)...", flush=True)
     print(f"Target JainGPT Backend API: {API_URL}", flush=True)
     app = build_telegram_app()
