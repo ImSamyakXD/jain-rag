@@ -10,5 +10,4 @@ langchain-community
 langchain-groq
 langchain-google-genai
 
-python-telegram-bot>=20.0
 gunicorn
