@@ -8,7 +8,10 @@ if hasattr(sys.stdout, "reconfigure"):
 if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+except ImportError:
+    ChatGoogleGenerativeAI = None
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
@@ -71,14 +74,17 @@ def get_llms():
         except Exception as e:
             print(f"Groq init notice: {e}")
 
-    if google_key and google_key.strip() and not google_key.strip().startswith("your_"):
+    if ChatGoogleGenerativeAI and google_key and google_key.strip() and not google_key.strip().startswith("your_"):
         gemini_models = ["gemini-flash-latest", "gemini-1.5-flash", "gemini-pro"]
         for m in gemini_models:
-            candidates.append(ChatGoogleGenerativeAI(
-                model=m,
-                google_api_key=google_key.strip(),
-                temperature=0
-            ))
+            try:
+                candidates.append(ChatGoogleGenerativeAI(
+                    model=m,
+                    google_api_key=google_key.strip(),
+                    temperature=0
+                ))
+            except Exception:
+                pass
 
     return candidates
 
