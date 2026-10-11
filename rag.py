@@ -62,7 +62,7 @@ def get_llms():
     if groq_key and groq_key.strip() and not groq_key.strip().startswith("your_"):
         try:
             from langchain_groq import ChatGroq
-            for gm in ["groq/compound-mini", "groq/compound", "openai/gpt-oss-20b"]:
+            for gm in ["openai/gpt-oss-20b", "openai/gpt-oss-120b", "qwen/qwen3.6-27b"]:
                 candidates.append(ChatGroq(
                     model_name=gm,
                     groq_api_key=groq_key.strip(),

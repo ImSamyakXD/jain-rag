@@ -47,6 +47,12 @@ async def startup_event():
             get_base_retriever()
             get_llm()
             print("JainGPT AI service ready!", flush=True)
+
+            # Optional: auto-start Telegram bot alongside FastAPI if enabled
+            import os
+            if os.getenv("START_TELEGRAM_BOT", "false").lower() in ("true", "1", "yes"):
+                from telegram_bot import start_bot_thread
+                start_bot_thread()
         except Exception as e:
             print(f"Pre-warm notice: {e}", flush=True)
     threading.Thread(target=prewarm, daemon=True).start()
