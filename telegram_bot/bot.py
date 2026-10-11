@@ -23,7 +23,7 @@ from telegram.ext import (
     filters,
 )
 
-TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8902525488:AAGrU6eNvzJgPmDSyZ3h1EoMe7aQPhuVDVY").strip()
+TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 API_URL = os.getenv("JAINGPT_API_URL", "https://jaingpt-bot.onrender.com/api/chat").strip()
 
 
